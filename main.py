@@ -1,16 +1,8 @@
 import pygame
 import math
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 
 # Inicializa Pygame
 pygame.init()
-
-# Lista de pontos do perfil
-profile_points = []
-
-# Número de slices para revolucionar o perfil
-num_slices = 120
 
 # Configurações da tela 2D
 width, height = 1600, 900
@@ -43,6 +35,36 @@ sensitivity_factor = 0.1  # Quanto menor o valor, menor a sensibilidade
 # Variável para controlar a escala (zoom)
 scale_factor = 1.0  # Valor inicial da escala
 
+# Número de slices para revolucionar o perfil 2D
+num_slices = 30
+
+# Classe para representar o polígono
+class Polygon:
+    def __init__(self):
+        self.points = []
+        self.closed = False
+
+    def add_point(self, point):
+        if not self.closed:
+            self.points.append(point)
+
+    def close(self):
+        if len(self.points) >= 2:
+            self.points.append(self.points[0])  # Link the last point with the first one
+            self.closed = True
+
+    def draw(self):
+        # Desenha os pontos do polígono
+        for point in self.points:
+            pygame.draw.circle(screen, (0, 0, 0), point, 3)
+
+        # Desenha as arestas do polígono
+        if len(self.points) >= 2:
+            pygame.draw.lines(screen, (0, 0, 0), False, self.points, 2)
+
+# Cria uma instância do polígono
+polygon = Polygon()
+
 # Função para atualizar a escala com base nas entradas do teclado
 def update_scale(event, scale_factor):
     global num_slices  # Você pode precisar ajustar o número de slices para manter a aparência correta
@@ -54,8 +76,8 @@ def update_scale(event, scale_factor):
 
 # Função para atualizar a rotação do objeto com base no movimento do mouse
 def update_rotation_on_mouse_motion(rotation_x, rotation_y, dx, dy, sensitivity_factor):
-    rotation_x += dy * sensitivity_factor  # Movimento vertical do mouse afeta a rotação em torno do eixo X
-    rotation_y += dx * sensitivity_factor  # Movimento horizontal do mouse afeta a rotação em torno do eixo Y
+    rotation_x += dx * sensitivity_factor  # Movimento horizontal do mouse afeta a rotação em torno do eixo X
+    rotation_y += dy * sensitivity_factor  # Movimento vertical do mouse afeta a rotação em torno do eixo Y
     return rotation_x, rotation_y
 
 def update_camera(event, camera_x, camera_y, camera_z):
@@ -72,7 +94,6 @@ def update_camera(event, camera_x, camera_y, camera_z):
     elif event.key == pygame.K_d:  # Tecla 'D' para mover para trás (aumentar Z)
         camera_z += 10
     return camera_x, camera_y, camera_z
-
 
 # Função para desenhar o grid
 def draw_grid():
@@ -117,7 +138,6 @@ def revolve_profile(profile, slices, angle_offset, rotation_x, rotation_y, scale
 
 # Função para desenhar o wireframe 3D
 def draw_wireframe(points, slices, camera_x, camera_y, camera_z):
-    # Desenha as linhas horizontais
     for i in range(len(points)):
         # Ajusta os pontos para a profundidade da câmera
         z_adjusted_x = (points[i][0] - camera_z) + width // 2 - camera_x
@@ -129,9 +149,9 @@ def draw_wireframe(points, slices, camera_x, camera_y, camera_z):
                          (next_z_adjusted_x, next_z_adjusted_y), 1)
     # Desenha as linhas verticais
     for i in range(slices):
-        for j in range(len(profile_points)):
-            start_index = i * len(profile_points) + j
-            end_index = (start_index + len(profile_points)) % len(points)
+        for j in range(len(polygon.points)):
+            start_index = i * len(polygon.points) + j
+            end_index = (start_index + len(polygon.points)) % len(points)
             # Ajusta os pontos para a profundidade da câmera
             start_z_adjusted_x = (points[start_index][0] - camera_z) + width // 2 - camera_x
             start_z_adjusted_y = (points[start_index][1] - camera_z) + height // 2 - camera_y
@@ -143,55 +163,40 @@ def draw_wireframe(points, slices, camera_x, camera_y, camera_z):
 
 # Main loop
 running = True
-polygon_closed = False  # Flag to track if the polygon is closed
 angle_offset = 0  # Ângulo de rotação do wireframe 3D
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
         if event.type == pygame.MOUSEBUTTONDOWN:
-            if not polygon_closed:  # Only allow adding points if the polygon is not closed
-                profile_points.append(event.pos)
-            mouse_pressed_for_rotation = True
-            if event.type == pygame.MOUSEBUTTONUP:
-                mouse_pressed_for_rotation = False
-            if event.type == pygame.MOUSEMOTION:
-                if mouse_pressed_for_rotation:
-                    rotation_x, rotation_y = update_rotation_on_mouse_motion(rotation_x, rotation_y, event.rel[0], event.rel[1])
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_RETURN:
-                if len(profile_points) >= 2:
-                    profile_points.append(profile_points[0])  # Link the last point with the first one
-                    polygon_closed = True
-                    screen3D = pygame.display.set_mode((width, height))
-                    pygame.display.set_caption('Trabalho 2 - Computação Gráfica - Wireframe 3D')
-        if event.type == pygame.KEYDOWN:
-            camera_x, camera_y, camera_z = update_camera(event, camera_x, camera_y, camera_z)
-            scale_factor = update_scale(event, scale_factor)
-        if event.type == pygame.MOUSEBUTTONDOWN:
+            if not polygon.closed:  # Only allow adding points if the polygon is not closed
+                polygon.add_point(event.pos)
             mouse_pressed_for_rotation = True
         if event.type == pygame.MOUSEBUTTONUP:
             mouse_pressed_for_rotation = False
         if event.type == pygame.MOUSEMOTION:
             if mouse_pressed_for_rotation:
                 rotation_x, rotation_y = update_rotation_on_mouse_motion(rotation_x, rotation_y, event.rel[0], event.rel[1], sensitivity_factor)
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_RETURN:
+                polygon.close()
+                if polygon.closed:
+                    screen3D = pygame.display.set_mode((width, height))
+                    pygame.display.set_caption('Trabalho 2 - Computação Gráfica - Wireframe 3D')
+            camera_x, camera_y, camera_z = update_camera(event, camera_x, camera_y, camera_z)
+            scale_factor = update_scale(event, scale_factor)
 
     screen.fill((255, 255, 255))
 
     # Desenha o perfil
-    for point in profile_points:
-        pygame.draw.circle(screen, (0, 0, 0), point, 3)
-
-    # Desenha as arestas
-    if len(profile_points) >= 2:
-        pygame.draw.lines(screen, (0, 0, 0), False, profile_points, 2)
+    polygon.draw()
 
     # Desenha o grid
     draw_grid()
 
     # Se o polígono estiver fechado, revoluciona e desenha o wireframe 3D
-    if polygon_closed and screen3D is not None:
-        revolved_points = revolve_profile(profile_points, num_slices, angle_offset, rotation_x, rotation_y, scale_factor)
+    if polygon.closed and screen3D is not None:
+        revolved_points = revolve_profile(polygon.points, num_slices, angle_offset, rotation_x, rotation_y, scale_factor)
         screen3D.fill((255, 255, 255))
         draw_wireframe(revolved_points, num_slices, camera_x, camera_y, camera_z)
 
